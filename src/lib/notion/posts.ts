@@ -26,6 +26,12 @@ export type Post = {
 
 export type PostWithContent = Post & { blocks: BlockNode[] };
 
+/** A post plus a flattened copy of its body, for client-side search. */
+export type SearchablePost = Post & { searchText: string };
+
+/** Caps how much body text per post is shipped to the browser for searching. */
+const SEARCH_TEXT_LIMIT = 4000;
+
 /**
  * A post is hidden while its title starts with `_` or `[draft]`, so you can
  * work on it inside "web-blog" without publishing it.
@@ -112,6 +118,47 @@ export async function getPosts(): Promise<Post[]> {
   );
 
   return posts.reverse();
+}
+
+/** Flatten a block tree to one searchable string, including nested children. */
+function blocksToText(blocks: BlockNode[]): string {
+  const parts: string[] = [];
+
+  for (const block of blocks) {
+    if (block.type === "table_row") {
+      parts.push(block.table_row.cells.map(plainText).join(" "));
+    } else {
+      const text = plainText(blockRichText(block));
+      if (text) parts.push(text);
+    }
+    if (block.children.length > 0) parts.push(blocksToText(block.children));
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Posts with their body text attached, for the search box on the home page.
+ * Reuses the per-slug `getPost` cache entries rather than refetching.
+ */
+export async function getSearchablePosts(): Promise<SearchablePost[]> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(POSTS_TAG);
+
+  const posts = await getPosts();
+
+  return Promise.all(
+    posts.map(async (post) => {
+      const full = await getPost(post.slug);
+      return {
+        ...post,
+        searchText: full
+          ? blocksToText(full.blocks).slice(0, SEARCH_TEXT_LIMIT)
+          : "",
+      };
+    }),
+  );
 }
 
 /** A single post with its full block tree, or null if the slug is unknown. */
