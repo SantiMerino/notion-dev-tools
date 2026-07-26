@@ -42,45 +42,49 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   if (!post) notFound();
 
   return (
-    <article className="space-y-8">
+    <article>
+      {/* Kept outside the spacing flow below so the gap under it is set here
+          rather than fought with an !important override. */}
       <Link
         href="/"
-        className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+        className="text-muted-foreground hover:text-foreground mb-12 inline-block text-sm transition-colors sm:mb-16"
       >
         ← All posts
       </Link>
 
-      <header className="space-y-3">
-        {post.emoji && (
-          <div aria-hidden className="text-5xl">
-            {post.emoji}
-          </div>
-        )}
-        <h1 className="text-4xl font-semibold tracking-tight text-balance">
-          {post.title}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          <time dateTime={post.createdAt}>{formatDate(post.createdAt)}</time>
-          {post.updatedAt !== post.createdAt && (
-            <> · updated {formatDate(post.updatedAt)}</>
+      <div className="space-y-8">
+        <header className="space-y-3">
+          {post.emoji && (
+            <div aria-hidden className="text-5xl">
+              {post.emoji}
+            </div>
           )}
-        </p>
-      </header>
+          <h1 className="text-4xl font-semibold tracking-tight text-balance">
+            {post.title}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            <time dateTime={post.createdAt}>{formatDate(post.createdAt)}</time>
+            {post.updatedAt !== post.createdAt && (
+              <> · updated {formatDate(post.updatedAt)}</>
+            )}
+          </p>
+        </header>
 
-      {post.coverUrl && (
+        {post.coverUrl && (
         // Notion gives no dimensions and the proxy 302s to a signed URL, so
         // next/image can't help here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.coverUrl}
-          alt=""
-          className="h-56 w-full rounded-lg border object-cover"
-        />
-      )}
+          <img
+            src={post.coverUrl}
+            alt=""
+            className="h-56 w-full rounded-lg border object-cover"
+          />
+        )}
 
-      <Separator />
+        <Separator />
 
-      <NotionBlocks blocks={post.blocks} />
+        <NotionBlocks blocks={post.blocks} />
+      </div>
     </article>
   );
 }
