@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cacheLife } from "next/cache";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -28,8 +29,14 @@ export const metadata: Metadata = {
 
 // Reading the clock is non-deterministic, which Cache Components rejects
 // during prerender. Caching it pins one value per build instead.
+//
+// The explicit long lifetime matters: without it this falls back to the
+// `default` profile (15m), and because the layout wraps every route it would
+// pull each route's revalidate down to 15m. A copyright year does not need
+// refreshing more than once a month.
 async function CurrentYear() {
   "use cache";
+  cacheLife("max");
   return <>{new Date().getFullYear()}</>;
 }
 
