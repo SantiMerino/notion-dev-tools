@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { NotionBlocks } from "@/components/notion/blocks";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/format";
-import { getPost, getPosts } from "@/lib/notion/posts";
+import { getPost, getPosts, getSeriesLinks } from "@/lib/notion/posts";
 
 /**
  * Prerender every published post. This also tells Cache Components that
@@ -41,6 +43,14 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
   if (!post) notFound();
 
+  const seriesLinks = await getSeriesLinks(post);
+  const seriesIndex = seriesLinks.findIndex((link) => link.slug === post.slug);
+  const prevInSeries = seriesIndex > 0 ? seriesLinks[seriesIndex - 1] : null;
+  const nextInSeries =
+    seriesIndex >= 0 && seriesIndex < seriesLinks.length - 1
+      ? seriesLinks[seriesIndex + 1]
+      : null;
+
   return (
     <article>
       {/* Kept outside the spacing flow below so the gap under it is set here
@@ -59,8 +69,14 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
               {post.emoji}
             </div>
           )}
+          {post.series && (
+            <Badge variant="secondary" className="w-fit">
+              {post.series.seriesTitle} · Parte {post.series.part} de{" "}
+              {post.series.total}
+            </Badge>
+          )}
           <h1 className="text-4xl font-semibold tracking-tight text-balance">
-            {post.title}
+            {post.series ? post.series.displayTitle : post.title}
           </h1>
           <p className="text-muted-foreground text-sm">
             <time dateTime={post.createdAt}>{formatDate(post.createdAt)}</time>
@@ -84,6 +100,45 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
         <Separator />
 
         <NotionBlocks blocks={post.blocks} />
+
+        {seriesLinks.length > 1 && (
+          <>
+            <Separator />
+            <nav
+              aria-label="Series navigation"
+              className="grid gap-3 sm:grid-cols-2"
+            >
+              {prevInSeries ? (
+                <Link
+                  href={`/posts/${prevInSeries.slug}`}
+                  className="group flex flex-col gap-1 rounded-lg border p-4 transition-colors hover:border-foreground/25"
+                >
+                  <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                    <ArrowLeft className="size-3.5" /> Parte {prevInSeries.part}
+                  </span>
+                  <span className="font-medium group-hover:underline">
+                    {prevInSeries.title}
+                  </span>
+                </Link>
+              ) : (
+                <div />
+              )}
+              {nextInSeries && (
+                <Link
+                  href={`/posts/${nextInSeries.slug}`}
+                  className="group flex flex-col gap-1 rounded-lg border p-4 text-right transition-colors hover:border-foreground/25 sm:col-start-2"
+                >
+                  <span className="text-muted-foreground flex items-center justify-end gap-1 text-xs">
+                    Parte {nextInSeries.part} <ArrowRight className="size-3.5" />
+                  </span>
+                  <span className="font-medium group-hover:underline">
+                    {nextInSeries.title}
+                  </span>
+                </Link>
+              )}
+            </nav>
+          </>
+        )}
       </div>
     </article>
   );

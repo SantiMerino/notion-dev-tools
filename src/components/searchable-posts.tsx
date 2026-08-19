@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/format";
@@ -99,13 +100,19 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
                     />
                   )}
                   <CardHeader className="pt-6">
+                    {post.series && (
+                      <Badge variant="secondary" className="mb-1 w-fit">
+                        {post.series.seriesTitle} · Parte {post.series.part} de{" "}
+                        {post.series.total}
+                      </Badge>
+                    )}
                     <CardTitle className="text-xl leading-snug">
                       {post.emoji && (
                         <span aria-hidden className="mr-2">
                           {post.emoji}
                         </span>
                       )}
-                      {post.title}
+                      {post.series ? post.series.displayTitle : post.title}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pb-6">

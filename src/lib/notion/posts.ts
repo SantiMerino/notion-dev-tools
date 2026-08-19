@@ -13,6 +13,14 @@ import { slugify, uniqueSlug } from "./slug";
 /** Cache tag invalidated by POST /api/revalidate. */
 export const POSTS_TAG = "notion-posts";
 
+/** A post's place in a multi-part series, e.g. "Canvas + Notion parte 2: ...". */
+export type SeriesInfo = {
+  seriesTitle: string;
+  displayTitle: string;
+  part: number;
+  total: number;
+};
+
 export type Post = {
   id: string;
   slug: string;
@@ -22,7 +30,30 @@ export type Post = {
   coverUrl: string | null;
   createdAt: string;
   updatedAt: string;
+  series: SeriesInfo | null;
 };
+
+/** A post's siblings within its series, in part order. */
+export type SeriesLink = { slug: string; title: string; part: number };
+
+const SERIES_TITLE_PATTERN = /^(.*?)\s+parte\s+(\d+)\s*:\s*(.+)$/i;
+
+/**
+ * Splits a title like "Canvas + Notion parte 2: features avanzados" into its
+ * series name, part number, and the part-specific display title. Posts whose
+ * title doesn't match aren't part of a series.
+ */
+function parseSeriesTitle(
+  title: string,
+): { seriesTitle: string; displayTitle: string; part: number } | null {
+  const match = title.match(SERIES_TITLE_PATTERN);
+  if (!match) return null;
+  return {
+    seriesTitle: match[1].trim(),
+    part: Number(match[2]),
+    displayTitle: match[3].trim(),
+  };
+}
 
 export type PostWithContent = Post & { blocks: BlockNode[] };
 
@@ -91,6 +122,18 @@ export async function getPosts(): Promise<Post[]> {
     uniqueSlug(slugify(block.child_page.title), block.id, taken),
   );
 
+  // A title only counts as a series once a second post shares its series
+  // name — one post matching the "parte N:" pattern on its own isn't a series.
+  const seriesCounts = new Map<string, number>();
+  for (const block of pages) {
+    const parsed = parseSeriesTitle(block.child_page.title);
+    if (!parsed) continue;
+    seriesCounts.set(
+      parsed.seriesTitle,
+      (seriesCounts.get(parsed.seriesTitle) ?? 0) + 1,
+    );
+  }
+
   const posts = await Promise.all(
     pages.map(async (block, index): Promise<Post> => {
       const [page, preview] = await Promise.all([
@@ -98,6 +141,9 @@ export async function getPosts(): Promise<Post[]> {
         // Only the first few blocks are needed to build an excerpt.
         notion.blocks.children.list({ block_id: block.id, page_size: 10 }),
       ]);
+
+      const parsed = parseSeriesTitle(block.child_page.title);
+      const total = parsed ? (seriesCounts.get(parsed.seriesTitle) ?? 0) : 0;
 
       return {
         id: block.id,
@@ -113,11 +159,30 @@ export async function getPosts(): Promise<Post[]> {
         coverUrl: isFullPage(page) ? coverUrlOf(page) : null,
         createdAt: block.created_time,
         updatedAt: block.last_edited_time,
+        series:
+          parsed && total > 1
+            ? { ...parsed, total }
+            : null,
       };
     }),
   );
 
   return posts.reverse();
+}
+
+/** Every other post in the same series as `post`, in part order. */
+export async function getSeriesLinks(post: Post): Promise<SeriesLink[]> {
+  if (!post.series) return [];
+
+  const posts = await getPosts();
+  return posts
+    .filter((candidate) => candidate.series?.seriesTitle === post.series?.seriesTitle)
+    .map((candidate) => ({
+      slug: candidate.slug,
+      title: candidate.series!.displayTitle,
+      part: candidate.series!.part,
+    }))
+    .sort((a, b) => a.part - b.part);
 }
 
 /** Flatten a block tree to one searchable string, including nested children. */
