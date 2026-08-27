@@ -128,3 +128,43 @@
     @apply font-sans;
   }
 }
+/* Post index entrance: each row rises into place, staggered by an inline
+   animation-delay. `both` fill mode covers the delay window, so a row is
+   already hidden before its turn instead of flashing in and back out. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@layer components {
+  /* Hover underline for the post titles. Painted as a background rather than
+     border/pseudo-element so it tracks each line box when a title wraps. */
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 calc(100% - 0.08em);
+    background-size: 0% 1px;
+    transition: background-size 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .group:hover .link-underline,
+  .group:focus-visible .link-underline {
+    background-size: 100% 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .link-underline {
+      transition: none;
+    }
+  }
+}

@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { ArrowUpRight, Search, X } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { formatDate } from "@/lib/format";
+import { formatShortDate } from "@/lib/format";
 import type { SearchablePost } from "@/lib/notion/posts";
 import { fold, findSnippet, type Snippet } from "@/lib/search";
 
 type Result = SearchablePost & { snippet: Snippet | null };
+
+// Rows animate in on mount only -- React keeps the DOM node for a post that
+// survives a search, so filtering doesn't replay the stagger on every keystroke.
+// Capped so a long archive doesn't end with rows waiting seconds for their turn.
+const STAGGER_MS = 55;
+const MAX_STAGGERED = 10;
 
 export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
   const [query, setQuery] = useState("");
@@ -32,26 +35,36 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
   }, [posts, trimmed]);
 
   return (
-    <div className="space-y-6">
+    <div>
       <div className="relative">
         <Search
           aria-hidden
-          className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+          className="text-muted-foreground/70 pointer-events-none absolute top-1/2 left-0 size-4 -translate-y-1/2"
         />
-        <Input
+        <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search titles and post content…"
+          placeholder="Search"
           aria-label="Search posts"
-          className="pr-10 pl-9"
+          className="peer placeholder:text-muted-foreground/60 w-full appearance-none border-0 bg-transparent py-3 pr-8 pl-7 text-sm outline-none [&::-webkit-search-cancel-button]:hidden"
+        />
+        <span
+          aria-hidden
+          className="bg-border absolute inset-x-0 bottom-0 h-px"
+        />
+        {/* Focus ring is suppressed above, so the sweeping rule is the only
+            focus affordance -- it has to be unmistakable, not decorative. */}
+        <span
+          aria-hidden
+          className="bg-foreground absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 transition-transform duration-500 ease-out peer-focus:scale-x-100 motion-reduce:transition-none"
         />
         {trimmed && (
           <button
             type="button"
             onClick={() => setQuery("")}
             aria-label="Clear search"
-            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-0 -translate-y-1/2 transition-colors"
           >
             <X className="size-4" />
           </button>
@@ -59,7 +72,7 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
       </div>
 
       {trimmed && (
-        <p aria-live="polite" className="text-muted-foreground text-sm">
+        <p aria-live="polite" className="text-muted-foreground pt-6 text-sm">
           {results.length === 0
             ? "No posts match "
             : `${results.length} ${results.length === 1 ? "post" : "posts"} matching `}
@@ -70,72 +83,76 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
       )}
 
       {results.length === 0 ? (
-        <Card>
-          <CardContent className="text-muted-foreground py-10 text-center text-sm">
-            {posts.length === 0 ? (
-              <>
-                No posts yet. Add a subpage under your <strong>web-blog</strong>{" "}
-                page in Notion, then reload.
-              </>
-            ) : (
-              <>Try a different keyword.</>
-            )}
-          </CardContent>
-        </Card>
+        <p className="text-muted-foreground py-16 text-sm">
+          {posts.length === 0 ? (
+            <>
+              No posts yet. Add a subpage under your <strong>web-blog</strong>{" "}
+              page in Notion, then reload.
+            </>
+          ) : (
+            <>Try a different keyword.</>
+          )}
+        </p>
       ) : (
-        <ul className="space-y-4">
-          {results.map((post) => (
-            <li key={post.id}>
-              <Link href={`/posts/${post.slug}`} className="group block">
-                <Card className="group-hover:border-foreground/25 overflow-hidden py-0 transition-colors">
-                  {post.coverUrl && (
-                    // Notion gives no dimensions and the proxy 302s to a signed
-                    // URL, so next/image can't help here.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={post.coverUrl}
-                      alt=""
-                      loading="lazy"
-                      className="h-40 w-full object-cover"
-                    />
-                  )}
-                  <CardHeader className="pt-6">
-                    {post.series && (
-                      <Badge variant="secondary" className="mb-1 w-fit">
-                        {post.series.seriesTitle} · Parte {post.series.part} de{" "}
-                        {post.series.total}
-                      </Badge>
-                    )}
-                    <CardTitle className="text-xl leading-snug">
-                      {post.emoji && (
-                        <span aria-hidden className="mr-2">
-                          {post.emoji}
-                        </span>
-                      )}
-                      {post.series ? post.series.displayTitle : post.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pb-6">
-                    {post.snippet ? (
-                      <p className="text-muted-foreground text-sm leading-6">
-                        {post.snippet.before}
-                        <mark className="bg-yellow-500/25 text-foreground rounded px-0.5">
-                          {post.snippet.match}
-                        </mark>
-                        {post.snippet.after}
-                      </p>
-                    ) : (
-                      post.excerpt && (
-                        <p className="text-muted-foreground line-clamp-2 text-sm leading-6">
-                          {post.excerpt}
-                        </p>
-                      )
-                    )}
-                    <p className="text-muted-foreground mt-3 text-xs">
-                      {formatDate(post.createdAt)}
+        <ul className="mt-2">
+          {results.map((post, index) => (
+            <li
+              key={post.id}
+              style={{
+                animationDelay: `${Math.min(index, MAX_STAGGERED) * STAGGER_MS}ms`,
+              }}
+              className="border-border/70 motion-safe:animate-rise border-b last:border-b-0"
+            >
+              <Link
+                href={`/posts/${post.slug}`}
+                className="group grid gap-x-10 gap-y-2 py-7 outline-none sm:grid-cols-[6.5rem_1fr]"
+              >
+                <time
+                  dateTime={post.createdAt}
+                  className="text-muted-foreground group-hover:text-foreground/70 group-focus-visible:text-foreground/70 text-xs tracking-wide tabular-nums transition-colors duration-300 sm:pt-1.5"
+                >
+                  {formatShortDate(post.createdAt)}
+                </time>
+
+                <div className="min-w-0">
+                  {post.series && (
+                    <p className="text-muted-foreground mb-1.5 text-[0.6875rem] tracking-[0.12em] uppercase">
+                      {post.series.seriesTitle} · Parte {post.series.part} de{" "}
+                      {post.series.total}
                     </p>
-                  </CardContent>
-                </Card>
+                  )}
+
+                  <h2 className="text-lg leading-snug font-medium tracking-tight">
+                    {post.emoji && (
+                      <span aria-hidden className="mr-2">
+                        {post.emoji}
+                      </span>
+                    )}
+                    <span className="link-underline">
+                      {post.series ? post.series.displayTitle : post.title}
+                    </span>
+                    <ArrowUpRight
+                      aria-hidden
+                      className="mb-0.5 ml-1.5 inline-block size-4 -translate-x-1 opacity-0 transition duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-60 group-focus-visible:translate-x-0 group-focus-visible:opacity-60 motion-reduce:transition-none"
+                    />
+                  </h2>
+
+                  {post.snippet ? (
+                    <p className="text-muted-foreground mt-2 text-sm leading-6">
+                      {post.snippet.before}
+                      <mark className="text-foreground rounded bg-yellow-500/25 px-0.5">
+                        {post.snippet.match}
+                      </mark>
+                      {post.snippet.after}
+                    </p>
+                  ) : (
+                    post.excerpt && (
+                      <p className="text-muted-foreground mt-2 line-clamp-2 text-sm leading-6">
+                        {post.excerpt}
+                      </p>
+                    )
+                  )}
+                </div>
               </Link>
             </li>
           ))}

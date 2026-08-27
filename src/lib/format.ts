@@ -12,3 +12,18 @@ const formatter = new Intl.DateTimeFormat("en-US", {
 export function formatDate(iso: string): string {
   return formatter.format(new Date(iso));
 }
+
+const shortFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+/**
+ * Compact variant for the post index, where the date sits in a narrow column
+ * beside the title. Same UTC pinning as `formatDate`.
+ */
+export function formatShortDate(iso: string): string {
+  return shortFormatter.format(new Date(iso));
+}
