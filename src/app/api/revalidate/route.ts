@@ -24,8 +24,13 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // "max" serves the stale page while the fresh one renders in the background.
-  revalidateTag(POSTS_TAG, "max");
+  // `{ expire: 0 }`, not "max". Under "max" the tag is only marked stale, so
+  // the first visitor after publishing is still served the previous version
+  // and merely triggers the refetch in the background — the edit shows up on
+  // the *second* view. Expiring outright costs that one visitor a blocking
+  // fetch and makes the publish visible immediately, which is the whole point
+  // of calling this endpoint. Next's docs name this the webhook case.
+  revalidateTag(POSTS_TAG, { expire: 0 });
 
   return Response.json({ revalidated: true, at: new Date().toISOString() });
 }
