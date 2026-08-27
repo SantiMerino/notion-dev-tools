@@ -19,12 +19,37 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_NAME = "Blog";
+const SITE_DESCRIPTION = "Written in Notion, published here.";
+
 export const metadata: Metadata = {
+  // Required for the opengraph-image/twitter-image file conventions to emit
+  // absolute URLs. Without it Next falls back to localhost in dev and to
+  // VERCEL_URL in production -- the latter being the per-deployment hostname,
+  // not the custom domain, which breaks previews on the canonical URL.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://notion.santimh.dev",
+  ),
   title: {
-    default: "Blog",
-    template: "%s · Blog",
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
-  description: "Written in Notion, published here.",
+  description: SITE_DESCRIPTION,
+  // Stated explicitly rather than left to be inferred from the title/description
+  // tags: crawlers that infer og:* flag it as a warning, and inference gives no
+  // control over og:image at all.
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 // Reading the clock is non-deterministic, which Cache Components rejects

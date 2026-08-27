@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/format";
 import { getPost, getPosts, getSeriesLinks } from "@/lib/notion/posts";
+import { openGraphImage, twitterImage } from "@/app/shared-metadata";
 
 /**
  * Prerender every published post. This also tells Cache Components that
@@ -29,10 +30,20 @@ export async function generateMetadata(
     title: post.title,
     description: post.excerpt || undefined,
     openGraph: {
+      ...openGraphImage,
       title: post.title,
       description: post.excerpt || undefined,
+      url: `/posts/${post.slug}`,
       type: "article",
       publishedTime: post.createdAt,
+    },
+    // Restated per-post: the root layout's `twitter` block would otherwise be
+    // inherited verbatim, captioning every shared post with the site title.
+    twitter: {
+      ...twitterImage,
+      card: "summary_large_image",
+      title: post.title,
+      description: post.excerpt || undefined,
     },
   };
 }
