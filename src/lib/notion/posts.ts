@@ -98,12 +98,51 @@ function coverUrlOf(page: PageObjectResponse): string | null {
 }
 
 /**
+ * A cheap string that changes whenever any post does.
+ *
+ * Listing the blog page's children is a single request that carries every
+ * child's `last_edited_time`, and Notion keeps that timestamp in step with the
+ * page's own — editing a post's body bumps it, not just renaming the page. So
+ * one small call is enough to tell whether a full refetch is warranted.
+ *
+ * This is the only function on a short cache life. Everything expensive below
+ * takes the fingerprint as an argument, which makes it part of that function's
+ * cache key: same fingerprint means the cached result stands, and a changed one
+ * misses into a fresh fetch. The result is a ~60s ceiling on staleness that
+ * costs one request per minute instead of re-reading the whole blog on a timer.
+ */
+async function contentFingerprint(): Promise<string> {
+  "use cache";
+  // `stale: 0` keeps the client router from holding its own copy for the
+  // default 5 minutes, which would mask a fresh server render on navigation.
+  cacheLife({ stale: 0, revalidate: 60, expire: 300 });
+  cacheTag(POSTS_TAG);
+
+  const children = await collectPaginatedAPI(notion.blocks.children.list, {
+    block_id: blogPageId(),
+  });
+
+  return children
+    .filter(isFullBlock)
+    .filter((block) => block.type === "child_page")
+    .map((block) => `${block.id}:${block.last_edited_time}`)
+    .sort()
+    .join("|");
+}
+
+/**
  * Every published post under the "web-blog" page, newest first.
  */
 export async function getPosts(): Promise<Post[]> {
+  return postsFor(await contentFingerprint());
+}
+
+/** `fingerprint` is unread on purpose — it exists to key the cache entry. */
+async function postsFor(fingerprint: string): Promise<Post[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("days");
   cacheTag(POSTS_TAG);
+  void fingerprint;
 
   const children = await collectPaginatedAPI(notion.blocks.children.list, {
     block_id: blogPageId(),
@@ -207,15 +246,23 @@ function blocksToText(blocks: BlockNode[]): string {
  * Reuses the per-slug `getPost` cache entries rather than refetching.
  */
 export async function getSearchablePosts(): Promise<SearchablePost[]> {
+  return searchablePostsFor(await contentFingerprint());
+}
+
+async function searchablePostsFor(
+  fingerprint: string,
+): Promise<SearchablePost[]> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("days");
   cacheTag(POSTS_TAG);
 
-  const posts = await getPosts();
+  // Threading the fingerprint through rather than calling the public wrappers
+  // keeps this to one probe for the whole page instead of one per post.
+  const posts = await postsFor(fingerprint);
 
   return Promise.all(
     posts.map(async (post) => {
-      const full = await getPost(post.slug);
+      const full = await postFor(fingerprint, post.slug);
       return {
         ...post,
         searchText: full
@@ -228,11 +275,20 @@ export async function getSearchablePosts(): Promise<SearchablePost[]> {
 
 /** A single post with its full block tree, or null if the slug is unknown. */
 export async function getPost(slug: string): Promise<PostWithContent | null> {
+  return postFor(await contentFingerprint(), slug);
+}
+
+async function postFor(
+  fingerprint: string,
+  slug: string,
+): Promise<PostWithContent | null> {
   "use cache";
-  cacheLife("hours");
+  cacheLife("days");
   cacheTag(POSTS_TAG);
 
-  const post = (await getPosts()).find((candidate) => candidate.slug === slug);
+  const post = (await postsFor(fingerprint)).find(
+    (candidate) => candidate.slug === slug,
+  );
   if (!post) return null;
 
   return { ...post, blocks: await fetchBlockTree(post.id) };
