@@ -18,9 +18,15 @@ Notion "web-blog" page
 - `src/components/notion/blocks.tsx` maps each Notion block type to JSX.
 
 Content is cached with Next.js [Cache Components](https://nextjs.org/docs/app/getting-started/caching)
-(`use cache` + `cacheLife("hours")`), so visitors are served a static shell and
-Notion is hit at most once an hour — or immediately after you call the
-revalidate endpoint.
+(`use cache` + `cacheLife`), so visitors are served a static shell instead of
+waiting on Notion. A change in Notion goes live one of two ways:
+
+- **Notion webhook → `POST /api/revalidate`** clears the cache the moment you
+  edit, publish, move, or delete a page. This is the path that keeps the site
+  in sync. Setup is below.
+- **Fingerprint timer** (`src/lib/notion/posts.ts`) is a ~60s backstop: one
+  cheap Notion call spots that *something* changed and forces a refetch, in
+  case a webhook delivery is missed.
 
 ## Setup
 
@@ -56,16 +62,33 @@ To hide a work-in-progress, start the title with `_` or `[draft]`.
 
 ## Refreshing after an edit
 
-Cached content refreshes on its own within the hour. To push an edit live
-immediately:
+### Notion webhook (production)
+
+This is the mechanism that keeps the live site in step with Notion. One-time
+setup:
+
+1. Go to your integration at <https://www.notion.so/profile/integrations> →
+   **Webhooks** → **+ Create a subscription**.
+2. Set the endpoint URL to `https://<your-domain>/api/revalidate` and subscribe
+   to the **page** events: `page.created`, `page.content_updated`,
+   `page.properties_updated`, `page.moved`, `page.deleted`.
+3. Notion sends a one-time `POST` with a `verification_token`. The route logs
+   it (`[revalidate] Notion webhook verification_token: ...` in the Vercel
+   function logs) and echoes it in the response body.
+4. Paste that token into the Notion UI to confirm the subscription, **and**
+   set it as the `NOTION_WEBHOOK_SECRET` environment variable in Vercel, then
+   redeploy. The route uses it to verify the HMAC signature on every event.
+
+After that, editing or deleting a page in Notion clears the cache within
+seconds. Events with a missing or bad signature are rejected with `401`.
+
+### Manual trigger (local dev / one-off)
 
 ```bash
 curl -X POST http://localhost:3000/api/revalidate -H "x-revalidate-secret: YOUR_SECRET"
 ```
 
-In production you can point a
-[Notion webhook](https://developers.notion.com/reference/webhooks) at that URL
-so publishing in Notion updates the site right away.
+Guarded by `REVALIDATE_SECRET`, independent of the webhook.
 
 ## Supported blocks
 
