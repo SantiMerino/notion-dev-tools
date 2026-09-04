@@ -113,9 +113,14 @@ function coverUrlOf(page: PageObjectResponse): string | null {
  */
 async function contentFingerprint(): Promise<string> {
   "use cache";
-  // `stale: 0` keeps the client router from holding its own copy for the
-  // default 5 minutes, which would mask a fresh server render on navigation.
-  cacheLife({ stale: 0, revalidate: 60, expire: 300 });
+  // The Notion webhook (POST /api/revalidate) is what makes edits show up
+  // immediately; this timer is only a backstop for a missed delivery. `stale:
+  // 0` keeps the client router from holding its own copy across navigations.
+  // `expire` sits close to `revalidate` on purpose: past `revalidate` the old
+  // fingerprint is still *served* once while it refreshes in the background,
+  // so a low-traffic site would otherwise show a deleted post a full extra
+  // page-view longer. A short `expire` caps that stale-serving window.
+  cacheLife({ stale: 0, revalidate: 60, expire: 180 });
   cacheTag(POSTS_TAG);
 
   const children = await collectPaginatedAPI(notion.blocks.children.list, {
@@ -140,7 +145,7 @@ export async function getPosts(): Promise<Post[]> {
 /** `fingerprint` is unread on purpose — it exists to key the cache entry. */
 async function postsFor(fingerprint: string): Promise<Post[]> {
   "use cache";
-  cacheLife("days");
+  cacheLife("content");
   cacheTag(POSTS_TAG);
   void fingerprint;
 
@@ -253,7 +258,7 @@ async function searchablePostsFor(
   fingerprint: string,
 ): Promise<SearchablePost[]> {
   "use cache";
-  cacheLife("days");
+  cacheLife("content");
   cacheTag(POSTS_TAG);
 
   // Threading the fingerprint through rather than calling the public wrappers
@@ -283,7 +288,7 @@ async function postFor(
   slug: string,
 ): Promise<PostWithContent | null> {
   "use cache";
-  cacheLife("days");
+  cacheLife("content");
   cacheTag(POSTS_TAG);
 
   const post = (await postsFor(fingerprint)).find(
