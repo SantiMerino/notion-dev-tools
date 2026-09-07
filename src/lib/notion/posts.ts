@@ -21,12 +21,21 @@ export type SeriesInfo = {
   total: number;
 };
 
+/**
+ * A post's Notion page icon, normalized for rendering: either a Unicode emoji
+ * or an image URL (already a stable link or a proxy path, never a raw signed
+ * one).
+ */
+export type PostIcon =
+  | { kind: "emoji"; emoji: string }
+  | { kind: "image"; url: string };
+
 export type Post = {
   id: string;
   slug: string;
   title: string;
   excerpt: string;
-  emoji: string | null;
+  icon: PostIcon | null;
   coverUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -82,8 +91,28 @@ function buildExcerpt(blocks: BlockNode[]): string {
   return "";
 }
 
-function emojiOf(page: PageObjectResponse): string | null {
-  return page.icon?.type === "emoji" ? page.icon.emoji : null;
+/**
+ * Normalize a page icon to something renderable. Notion has five icon types: a
+ * Unicode `emoji`; a workspace `custom_emoji` and an `external` link, both on
+ * stable URLs usable as-is; an uploaded `file`, whose URL is pre-signed and
+ * expires in about an hour, so it goes through the same proxy as covers; and
+ * the built-in `icon` gallery, which we don't render.
+ */
+function iconOf(page: PageObjectResponse): PostIcon | null {
+  const icon = page.icon;
+  if (!icon) return null;
+  switch (icon.type) {
+    case "emoji":
+      return { kind: "emoji", emoji: icon.emoji };
+    case "custom_emoji":
+      return { kind: "image", url: icon.custom_emoji.url };
+    case "external":
+      return { kind: "image", url: icon.external.url };
+    case "file":
+      return { kind: "image", url: `/api/notion-image?type=icon&id=${page.id}` };
+    default:
+      return null;
+  }
 }
 
 /**
@@ -199,7 +228,7 @@ async function postsFor(fingerprint: string): Promise<Post[]> {
             children: [],
           })),
         ),
-        emoji: isFullPage(page) ? emojiOf(page) : null,
+        icon: isFullPage(page) ? iconOf(page) : null,
         coverUrl: isFullPage(page) ? coverUrlOf(page) : null,
         createdAt: block.created_time,
         updatedAt: block.last_edited_time,

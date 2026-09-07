@@ -37,6 +37,11 @@ export async function GET(request: NextRequest) {
       if (isFullPage(page) && page.cover?.type === "file") {
         url = page.cover.file.url;
       }
+    } else if (type === "icon") {
+      const page = await notion.pages.retrieve({ page_id: id });
+      if (isFullPage(page) && page.icon?.type === "file") {
+        url = page.icon.file.url;
+      }
     } else {
       const block = await notion.blocks.retrieve({ block_id: id });
       if (isFullBlock(block)) url = urlFromBlock(block);

@@ -123,10 +123,18 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
                   )}
 
                   <h2 className="text-lg leading-snug font-medium tracking-tight">
-                    {post.emoji && (
+                    {post.icon?.kind === "emoji" && (
                       <span aria-hidden className="mr-2">
-                        {post.emoji}
+                        {post.icon.emoji}
                       </span>
+                    )}
+                    {post.icon?.kind === "image" && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={post.icon.url}
+                        alt=""
+                        className="mr-2 inline-block size-5 object-contain align-[-0.2em]"
+                      />
                     )}
                     <span className="link-underline">
                       {post.series ? post.series.displayTitle : post.title}

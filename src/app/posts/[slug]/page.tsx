@@ -75,10 +75,20 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
 
       <div className="space-y-8">
         <header className="space-y-3">
-          {post.emoji && (
+          {post.icon?.kind === "emoji" && (
             <div aria-hidden className="text-5xl">
-              {post.emoji}
+              {post.icon.emoji}
             </div>
+          )}
+          {post.icon?.kind === "image" && (
+            // A file icon 302s through the proxy to a signed URL and Notion
+            // gives no dimensions, so next/image can't help here.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.icon.url}
+              alt=""
+              className="size-12 object-contain"
+            />
           )}
           {post.series && (
             <Badge variant="secondary" className="w-fit">
