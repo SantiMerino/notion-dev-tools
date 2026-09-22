@@ -5,6 +5,7 @@ import type { BlockNode } from "@/lib/notion/blocks";
 import { plainText } from "@/lib/notion/blocks";
 import { cn } from "@/lib/utils";
 
+import { CodeBlock } from "./code-block";
 import { RichText } from "./rich-text";
 
 /**
@@ -123,16 +124,10 @@ function Block({ block }: { block: BlockNode }) {
     case "code":
       return (
         <figure>
-          <div className="bg-muted relative overflow-hidden rounded-lg border">
-            <div className="text-muted-foreground border-b px-4 py-1.5 font-mono text-xs">
-              {block.code.language}
-            </div>
-            <pre className="overflow-x-auto p-4 text-sm">
-              <code className="font-mono">
-                {plainText(block.code.rich_text)}
-              </code>
-            </pre>
-          </div>
+          <CodeBlock
+            code={plainText(block.code.rich_text)}
+            language={block.code.language}
+          />
           {block.code.caption.length > 0 && (
             <figcaption className="text-muted-foreground mt-2 text-sm">
               <RichText value={block.code.caption} />
