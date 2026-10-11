@@ -95,7 +95,39 @@ Guarded by `REVALIDATE_SECRET`, independent of the webhook.
 Paragraphs, headings 1–3, bulleted / numbered / to-do lists (nested), quotes,
 callouts, code, dividers, images, video, bookmarks, embeds, toggles, columns,
 tables, and equations. Unsupported blocks are skipped rather than crashing the
-page.
+page. Code blocks are syntax-highlighted on the server with
+[Shiki](https://shiki.style) (both themes at once, switched by CSS), and
+`plain text` blocks wrap so prompts read like prose.
+
+Posts with three or more headings get a table of contents on the right edge
+on wide screens, and every heading has a `#` link.
+
+## Design
+
+The look is [santimh.dev](https://santimh.dev)'s, so the two sites read as
+one: same palette, type and radius scales, fonts (Inter + Geist Mono), dark by
+default with the same `santimh-theme` storage key, and the same class names
+for them (`bg-surface`, `text-muted`, `ring-line`, ...). `src/app/globals.css`
+mirrors the portfolio's `src/index.css`; change one, change the other.
+
+The keyboard shortcuts work the same way too (`src/hooks/use-hotkey.ts`), and
+the "? Keys" note beside the theme toggle lists them: `T` switches the theme,
+`/` searches posts from any page, `H` goes back to all posts, `?` opens the
+note. They pause while you type in a field.
+
+## Feeds
+
+- `/feed.xml` — RSS 2.0, for feed readers.
+- `/feed.json` — [JSON Feed 1.1](https://jsonfeed.org/version/1.1). Series
+  posts carry an `_series` object (`title`, `part_title`, `part`, `total`).
+- `/sitemap.xml` and `/robots.txt` for search engines.
+
+The portfolio's Writing section currently reads the **home page HTML**
+(`santimh/server/writing.ts`), so the post cards keep a markup contract: inside
+each `<a href="/posts/…">`, the first `<time dateTime>` is the date, the `<h2>`
+is the title, the `<p>` right before it is the series line and the `<p>` right
+after it is the excerpt. `/feed.json` has the same data in a structured form;
+switching the portfolio to it removes the contract.
 
 ## Notes
 

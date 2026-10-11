@@ -1,55 +1,60 @@
-"use client";
-
-import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
-
+import { highlight } from "@/lib/highlight";
 import { cn } from "@/lib/utils";
+
+import { CopyButton } from "./copy-button";
 
 /**
  * Notion's copy button and "Wrap" toggle live in its UI, not in the block the
  * API returns, so both are rebuilt here. Prompts (`plain text`) wrap; real code
  * keeps horizontal scroll so indentation stays intact.
+ *
+ * This stays a server component: the code is highlighted here and ships once,
+ * as HTML. Only the copy button hydrates, and it reads the text back out of
+ * the `<code>` below rather than receiving it as a prop.
  */
-export function CodeBlock({ code, language }: { code: string; language: string }) {
-  const [copied, setCopied] = useState(false);
+export async function CodeBlock({
+  code,
+  language,
+}: {
+  code: string;
+  language: string;
+}) {
   const wrap = language === "plain text";
-
-  useEffect(() => {
-    if (!copied) return;
-    const timeout = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timeout);
-  }, [copied]);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-    } catch {
-      // Clipboard is blocked (insecure context or denied permission); leave the text selectable.
-    }
-  }
+  const lines = await highlight(code, language);
 
   return (
-    <div className="bg-muted relative overflow-hidden rounded-lg border">
-      <div className="text-muted-foreground flex items-center justify-between border-b py-1.5 pr-2 pl-4 font-mono text-xs">
-        <span>{language}</span>
-        <button
-          type="button"
-          onClick={copy}
-          aria-label={copied ? "Copiado" : "Copiar código"}
-          className="hover:bg-background/60 hover:text-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors"
-        >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? "Copiado" : "Copiar"}
-        </button>
+    <div
+      data-code-block
+      className="bg-surface ring-line overflow-hidden rounded-lg ring-1 ring-inset"
+    >
+      <div className="border-line flex items-center justify-between gap-4 border-b py-1.5 pr-1.5 pl-4">
+        <span className="mono-xs text-faint lowercase">{language}</span>
+        <CopyButton />
       </div>
       <pre
         className={cn(
-          "p-4 text-sm",
+          "text-ui p-4 leading-[22px]",
           wrap ? "break-words whitespace-pre-wrap" : "overflow-x-auto",
         )}
       >
-        <code className="font-mono">{code}</code>
+        <code className="text-fg font-mono">
+          {lines
+            ? lines.map((line, index) => (
+                <span key={index}>
+                  {index > 0 ? "\n" : null}
+                  {line.map((token, tokenIndex) => (
+                    <span
+                      key={tokenIndex}
+                      className="shiki-token"
+                      style={token.htmlStyle}
+                    >
+                      {token.content}
+                    </span>
+                  ))}
+                </span>
+              ))
+            : code}
+        </code>
       </pre>
     </div>
   );

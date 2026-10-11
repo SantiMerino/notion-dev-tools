@@ -2,159 +2,254 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+ * The design system is santimh.dev's, so the blog and the portfolio read as
+ * one site: same palette, type scale, radii and elevation, and the same class
+ * names for them (`bg-surface`, `text-muted`, `ring-line`, ...). When one
+ * changes, change the other — santimh/src/index.css is the source.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
+/* Theme is a `data-theme` attribute on <html>, set by next-themes before paint. */
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------------------------------------------------------------- tokens */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Dark is the default look, as on the portfolio. */
+  --bg: #090a0c;
+  --bg-soft: #0d0f12;
+  --surface: #121418;
+  --surface-hover: #181a1e;
+  --line: #1e2126;
+  --line-strong: #2a2e35;
+  --fg: #f5f7fa;
+  --fg-muted: #9ea4ae;
+  /* ≈4.7:1 on --bg: faint still carries real text (dates, labels), so it must pass AA. */
+  --fg-faint: #767c86;
+  --accent: #16bf5e;
+  --elev-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --elev-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -12px rgb(0 0 0 / 0.7);
+  /* The ground under the page (footer): a step lighter than --bg. */
+  --bg-sunken: #111317;
+  /* Footer wordmark: a ghost fill with a hairline outline. */
+  --wordmark-fill: rgb(245 247 250 / 0.06);
+  --wordmark-line: #2a2e35;
+  color-scheme: dark;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+[data-theme="light"] {
+  --bg: #fcfcfd;
+  --bg-soft: #f7f8fa;
+  --surface: #ffffff;
+  --surface-hover: #f5f7fa;
+  --line: #e8eaee;
+  --line-strong: #d8dce2;
+  --fg: #0b0c0e;
+  --fg-muted: #4a515d;
+  --fg-faint: #646b76;
+  --accent: #16a34a;
+  --elev-card: 0 1px 2px rgb(12 14 20 / 0.04), 0 12px 32px -16px rgb(12 14 20 / 0.18);
+  --elev-float: 0 1px 2px rgb(12 14 20 / 0.05), 0 16px 40px -16px rgb(12 14 20 / 0.26);
+  --bg-sunken: #eceef2;
+  --wordmark-fill: rgb(11 12 14 / 0.05);
+  --wordmark-line: #d8dce2;
+  color-scheme: light;
 }
+
+/* Cleared before the theme below defines the two elevation steps. */
+@theme {
+  --shadow-*: initial;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-sunken: var(--bg-sunken);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+
+  /*
+   * shadcn/ui's names, aliased onto the palette so a component added with
+   * `npx shadcn add` still lands on these colours. `muted` and `accent` keep
+   * the portfolio's meaning (a text grey, the green), so a new component that
+   * uses `bg-muted` / `bg-accent` needs those swapped for `bg-surface-hover`.
+   */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-muted-foreground: var(--fg-muted);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+
+  --shadow-card: var(--elev-card);
+  --shadow-float: var(--elev-float);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * The scales. Tailwind's defaults are cleared, so a `rounded-*` or `text-*`
+ * size can only be one of these — the same ones the portfolio allows.
+ *
+ * Radius — nested corners are concentric: inside a padded container,
+ * inner = outer − padding. Never give a child its parent's radius.
+ */
+@theme {
+  --radius-*: initial;
+  --radius-xs: 2px; /* data marks */
+  --radius-sm: 4px; /* kbd, checkboxes, rows in a 6px-padded menu */
+  --radius-md: 6px; /* buttons, chips, inputs, small icon tiles */
+  --radius-lg: 10px; /* cards, popovers, code blocks */
+  --radius-xl: 14px; /* media frames */
+  --radius-2xl: 20px; /* shells that hold cards */
+
+  /* Type — sizes only; line height stays with `leading-*` or the body's 24px. */
+  --text-*: initial;
+  --text-micro: 11px; /* kbd caps, tiny mono badges */
+  --text-meta: 12px; /* dates, tags, captions */
+  --text-ui: 13px; /* menus, secondary UI, code */
+  --text-small: 14px; /* buttons, card text, footer */
+  --text-body: 16px; /* paragraphs, inputs */
+  --text-lead: 17px; /* card titles, H3 in a post */
+  --text-title: 20px; /* post titles in lists, H2 in a post */
+  --text-heading: 24px; /* H1 in a post (the blog's one addition: long-form needs a step here) */
+  --text-display: 32px; /* page titles */
+}
+
+/* ------------------------------------------------------------- base layer */
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--line);
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
-}
-/* Post index entrance: each row rises into place, staggered by an inline
-   animation-delay. `both` fill mode covers the delay window, so a row is
-   already hidden before its turn instead of flashing in and back out. */
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 24px;
+    letter-spacing: 0.01em;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  to {
-    opacity: 1;
-    transform: none;
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--accent) 28%, transparent);
+    color: var(--fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 999px;
+    border: 3px solid var(--bg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-@utility animate-rise {
-  animation: rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+/* ---------------------------------------------------------- shared pieces */
+
+@utility label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+@utility mono-xs {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The portfolio's entrance: a short rise out of a blur. It plays on mount
+ * here (the portfolio fires it on scroll); `--i` staggers siblings by 60ms.
+ * `both` fill mode keeps a block hidden through its delay instead of flashing
+ * in and back out.
+ */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+}
+
+@utility animate-reveal {
+  animation: reveal 0.7s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+/* Big surfaces rise without the blur: its paint cost grows with the area. */
+@keyframes reveal-flat {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@utility animate-reveal-flat {
+  animation: reveal-flat 0.7s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 @layer components {
-  /* Hover underline for the post titles. Painted as a background rather than
-     border/pseudo-element so it tracks each line box when a title wraps. */
+  /* Hover underline for post titles. Painted as a background rather than a
+     border or pseudo-element so it tracks each line box when a title wraps. */
   .link-underline {
-    background-image: linear-gradient(currentColor, currentColor);
+    background-image: linear-gradient(var(--line-strong), var(--line-strong));
     background-repeat: no-repeat;
-    background-position: 0 calc(100% - 0.08em);
+    background-position: 0 calc(100% - 0.02em);
     background-size: 0% 1px;
-    transition: background-size 500ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: background-size 500ms var(--ease-out-expo);
   }
 
   .group:hover .link-underline,
@@ -162,9 +257,20 @@
     background-size: 100% 1px;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .link-underline {
-      transition: none;
-    }
+  /*
+   * Syntax colours from Shiki. Each token carries both themes as variables
+   * (`--shiki-light`, `--shiki-dark`) and the page picks one, so a theme
+   * switch recolours code without re-rendering it.
+   */
+  .shiki-token {
+    color: var(--shiki-dark);
+    font-style: var(--shiki-dark-font-style);
+    font-weight: var(--shiki-dark-font-weight);
+  }
+
+  [data-theme="light"] .shiki-token {
+    color: var(--shiki-light);
+    font-style: var(--shiki-light-font-style);
+    font-weight: var(--shiki-light-font-weight);
   }
 }
