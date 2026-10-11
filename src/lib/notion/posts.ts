@@ -109,11 +109,11 @@ function coverUrlOf(page: PageObjectResponse): string | null {
  * page's own — editing a post's body bumps it, not just renaming the page. So
  * one small call is enough to tell whether a full refetch is warranted.
  *
- * This is the only function on a short cache life. Everything expensive below
- * takes the fingerprint as an argument, which makes it part of that function's
- * cache key: same fingerprint means the cached result stands, and a changed one
- * misses into a fresh fetch. The result is a ~60s ceiling on staleness that
- * costs one request per minute instead of re-reading the whole blog on a timer.
+ * Everything expensive below takes the fingerprint as an argument, which makes
+ * it part of that function's cache key: same fingerprint means the cached
+ * result stands, and a changed one misses into a fresh fetch. The result is a
+ * ~60s ceiling on staleness that costs one request per minute instead of
+ * re-reading the whole blog on a timer.
  */
 async function contentFingerprint(): Promise<string> {
   "use cache";
@@ -127,9 +127,7 @@ async function contentFingerprint(): Promise<string> {
   cacheLife({ stale: 0, revalidate: 60, expire: 180 });
   cacheTag(POSTS_TAG);
 
-  const children = await collectPaginatedAPI(notion.blocks.children.list, {
-    block_id: blogPageId(),
-  });
+  const children = await listBlogChildren();
 
   return children
     .filter(isFullBlock)
@@ -139,11 +137,60 @@ async function contentFingerprint(): Promise<string> {
     .join("|");
 }
 
+function listBlogChildren() {
+  return collectPaginatedAPI(notion.blocks.children.list, {
+    block_id: blogPageId(),
+  });
+}
+
+/**
+ * The blog page's children that are published posts, oldest first, with the
+ * slug each one is served at. Oldest first so slug collisions suffix the newer
+ * post, keeping already-published URLs stable.
+ */
+function publishedPages(
+  children: Awaited<ReturnType<typeof listBlogChildren>>,
+) {
+  const pages = children
+    .filter(isFullBlock)
+    .filter((block) => block.type === "child_page")
+    .filter((block) => !isDraft(block.child_page.title))
+    .sort((a, b) => a.created_time.localeCompare(b.created_time));
+
+  const taken = new Set<string>();
+  const slugs = pages.map((block) =>
+    uniqueSlug(slugify(block.child_page.title), block.id, taken),
+  );
+
+  return { pages, slugs };
+}
+
 /**
  * Every published post under the "web-blog" page, newest first.
  */
 export async function getPosts(): Promise<Post[]> {
   return postsFor(await contentFingerprint());
+}
+
+/**
+ * Whether `slug` is a published post, for the post route to 404 on before it
+ * starts streaming (a `notFound()` after that point can only send a 200).
+ *
+ * That check has to sit in the route's static shell, which a short-lived cache
+ * like `contentFingerprint` can't, so this keeps its own list: one children
+ * call, refreshed by the webhook like everything else and otherwise at most a
+ * minute stale (`expire` is long only so the entry qualifies for the shell).
+ */
+export async function isPublishedSlug(slug: string): Promise<boolean> {
+  return (await publishedSlugs()).includes(slug);
+}
+
+async function publishedSlugs(): Promise<string[]> {
+  "use cache";
+  cacheLife({ stale: 0, revalidate: 60, expire: 60 * 60 });
+  cacheTag(POSTS_TAG);
+
+  return publishedPages(await listBlogChildren()).slugs;
 }
 
 /** `fingerprint` is unread on purpose — it exists to key the cache entry. */
@@ -153,22 +200,7 @@ async function postsFor(fingerprint: string): Promise<Post[]> {
   cacheTag(POSTS_TAG);
   void fingerprint;
 
-  const children = await collectPaginatedAPI(notion.blocks.children.list, {
-    block_id: blogPageId(),
-  });
-
-  const pages = children
-    .filter(isFullBlock)
-    .filter((block) => block.type === "child_page")
-    .filter((block) => !isDraft(block.child_page.title))
-    // Oldest first so slug collisions suffix the newer post, keeping
-    // already-published URLs stable.
-    .sort((a, b) => a.created_time.localeCompare(b.created_time));
-
-  const taken = new Set<string>();
-  const slugs = pages.map((block) =>
-    uniqueSlug(slugify(block.child_page.title), block.id, taken),
-  );
+  const { pages, slugs } = publishedPages(await listBlogChildren());
 
   // A title only counts as a series once a second post shares its series
   // name — one post matching the "parte N:" pattern on its own isn't a series.

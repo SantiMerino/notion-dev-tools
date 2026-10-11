@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { Suspense, type CSSProperties } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -12,7 +12,12 @@ import { PostToc } from "@/components/post-toc";
 import { SeriesChip } from "@/components/series-chip";
 import { formatDate, formatShortDate } from "@/lib/format";
 import { headingsOf } from "@/lib/notion/headings";
-import { getPost, getPosts, getSeriesLinks } from "@/lib/notion/posts";
+import {
+  getPost,
+  getPosts,
+  getSeriesLinks,
+  isPublishedSlug,
+} from "@/lib/notion/posts";
 import { site } from "@/lib/site";
 
 const reveal = (index: number): CSSProperties =>
@@ -61,8 +66,43 @@ export async function generateMetadata(
 
 export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const { slug } = await props.params;
+
+  // Decided before the Suspense boundary below, while the status code can
+  // still change: once the fallback streams, a notFound() can only send a 200
+  // page marked noindex (a soft 404).
+  if (!(await isPublishedSlug(slug))) notFound();
+
+  return (
+    <Suspense fallback={<PostSkeleton />}>
+      <PostContent slug={slug} />
+    </Suspense>
+  );
+}
+
+/** The post header and a few lines of body, in outline, while the post streams in. */
+function PostSkeleton() {
+  const bar = "animate-pulse rounded-sm bg-surface-hover";
+
+  return (
+    <div aria-busy="true">
+      <span className={`block h-3 w-20 ${bar}`} />
+      <span className={`mt-12 block h-8 w-3/4 ${bar}`} />
+      <span className={`mt-5 block h-3 w-48 ${bar}`} />
+      <hr className="border-line my-10" />
+      <div className="space-y-3">
+        <span className={`block h-4 w-full ${bar}`} />
+        <span className={`block h-4 w-full ${bar}`} />
+        <span className={`block h-4 w-2/3 ${bar}`} />
+      </div>
+    </div>
+  );
+}
+
+async function PostContent({ slug }: { slug: string }) {
   const post = await getPost(slug);
 
+  // Only reachable in the minute after a rename or unpublish, before the slug
+  // list above catches up; that response can only be a soft 404.
   if (!post) notFound();
 
   const [seriesLinks, allPosts] = await Promise.all([
