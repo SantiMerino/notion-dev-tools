@@ -14,15 +14,6 @@ import { fold, findSnippet, type Snippet } from "@/lib/search";
 
 type Result = SearchablePost & { snippet: Snippet | null };
 
-/*
- * Markup contract: santimh.dev lists the latest posts by reading this page's
- * server HTML (santimh/server/writing.ts). Inside each `<a href="/posts/…">` it
- * takes the first `<time dateTime>`, the `<h2>` as the title, the `<p>` right
- * before the `<h2>` as the series line and the `<p>` right after it as the
- * excerpt. So: no other `<p>` ahead of the title, nothing but text in the
- * `<h2>`, and the excerpt directly after it.
- */
-
 /** Stagger index for the portfolio's entrance, capped so a long archive doesn't wait. */
 const reveal = (index: number): CSSProperties =>
   ({ "--i": Math.min(index, 12) }) as CSSProperties;

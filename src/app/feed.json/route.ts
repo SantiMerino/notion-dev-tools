@@ -5,10 +5,10 @@ import { site } from "@/lib/site";
 /**
  * Every published post as a JSON Feed 1.1 (https://jsonfeed.org/version/1.1).
  *
- * This is the structured way for santimh.dev to list the latest posts, instead
- * of reading the home page's HTML: each item carries the same fields the
- * portfolio parses today, and `_series` keeps a series post's name, part and
- * total apart from its title.
+ * santimh.dev's Writing section is built from this (santimh/server/writing.ts):
+ * it reads each item's `url`, `title`, `summary`, `date_published` and
+ * `_series`, so keep those stable. `_series` carries a series post's name,
+ * part and total apart from its title.
  */
 export async function GET() {
   const posts = await getPosts();
