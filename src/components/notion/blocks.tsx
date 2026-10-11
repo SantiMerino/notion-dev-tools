@@ -1,12 +1,18 @@
 import Link from "next/link";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
+import { ArrowUpRight, Check, ChevronRight } from "lucide-react";
 
 import type { BlockNode } from "@/lib/notion/blocks";
 import { plainText } from "@/lib/notion/blocks";
+import { iconOf } from "@/lib/notion/icons";
 import { cn } from "@/lib/utils";
 
 import { CodeBlock } from "./code-block";
+import { NotionIconView } from "./icon";
 import { RichText } from "./rich-text";
+
+/** Heading anchors by block id, from `headingsOf` — shared with the table of contents. */
+type Anchors = ReadonlyMap<string, string>;
 
 /**
  * Notion file URLs are pre-signed and expire after roughly an hour, so a
@@ -20,39 +26,84 @@ function fileUrl(
   return `/api/notion-image?type=block&id=${block.id}`;
 }
 
-function Block({ block }: { block: BlockNode }) {
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * A post heading with a `#` link in the left margin, so any section can be
+ * shared. Notion's H1–H3 render one level down: the post title is the `<h1>`.
+ */
+function Heading({
+  as: Tag,
+  id,
+  className,
+  children,
+}: {
+  as: "h2" | "h3" | "h4";
+  id: string | undefined;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tag
+      id={id}
+      className={cn(
+        "group/heading text-fg relative scroll-mt-24 font-medium tracking-[-0.01em] text-balance",
+        className,
+      )}
+    >
+      {id ? (
+        <a
+          href={`#${id}`}
+          aria-label="Link to this section"
+          className="text-faint hover:text-fg absolute top-0 -left-5 hidden pr-1 font-normal opacity-0 transition-opacity group-hover/heading:opacity-100 focus-visible:opacity-100 sm:block"
+        >
+          #
+        </a>
+      ) : null}
+      {children}
+    </Tag>
+  );
+}
+
+function Block({ block, anchors }: { block: BlockNode; anchors: Anchors }) {
   switch (block.type) {
     case "paragraph":
       // Notion emits empty paragraphs as spacing; keep them as vertical rhythm.
-      if (block.paragraph.rich_text.length === 0) return <div className="h-4" />;
+      if (block.paragraph.rich_text.length === 0) return <div className="h-2" />;
       return (
         <>
-          <p className="leading-7">
+          <p className="text-muted leading-7">
             <RichText value={block.paragraph.rich_text} />
           </p>
-          <Children blocks={block.children} indented />
+          <Children blocks={block.children} anchors={anchors} indented />
         </>
       );
 
     case "heading_1":
       return (
-        <h2 className="mt-10 scroll-m-20 text-3xl font-semibold tracking-tight">
+        <Heading as="h2" id={anchors.get(block.id)} className="text-heading mt-12 leading-8">
           <RichText value={block.heading_1.rich_text} />
-        </h2>
+        </Heading>
       );
 
     case "heading_2":
       return (
-        <h3 className="mt-8 scroll-m-20 text-2xl font-semibold tracking-tight">
+        <Heading as="h3" id={anchors.get(block.id)} className="text-title mt-10 leading-7">
           <RichText value={block.heading_2.rich_text} />
-        </h3>
+        </Heading>
       );
 
     case "heading_3":
       return (
-        <h4 className="mt-6 scroll-m-20 text-xl font-semibold tracking-tight">
+        <Heading as="h4" id={anchors.get(block.id)} className="text-lead mt-8 leading-6">
           <RichText value={block.heading_3.rich_text} />
-        </h4>
+        </Heading>
       );
 
     case "to_do":
@@ -61,61 +112,72 @@ function Block({ block }: { block: BlockNode }) {
           <span
             aria-hidden
             className={cn(
-              "mt-1 flex size-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none",
+              "mt-1.5 flex size-4 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset",
               block.to_do.checked
-                ? "bg-primary text-primary-foreground border-transparent"
-                : "border-muted-foreground/40",
+                ? "bg-accent ring-accent text-white"
+                : "ring-line-strong",
             )}
           >
-            {block.to_do.checked ? "✓" : ""}
+            {block.to_do.checked ? <Check className="size-3" strokeWidth={3} /> : null}
           </span>
           <div
             className={cn(
               "min-w-0 flex-1 leading-7",
-              block.to_do.checked && "text-muted-foreground line-through",
+              block.to_do.checked ? "text-faint line-through" : "text-muted",
             )}
           >
+            <span className="sr-only">
+              {block.to_do.checked ? "Done: " : "To do: "}
+            </span>
             <RichText value={block.to_do.rich_text} />
-            <Children blocks={block.children} indented />
+            <Children blocks={block.children} anchors={anchors} indented />
           </div>
         </li>
       );
 
     case "bulleted_list_item":
       return (
-        <li className="leading-7">
+        <li className="text-muted marker:text-faint pl-1 leading-7">
           <RichText value={block.bulleted_list_item.rich_text} />
-          <Children blocks={block.children} indented />
+          <Children blocks={block.children} anchors={anchors} indented />
         </li>
       );
 
     case "numbered_list_item":
       return (
-        <li className="leading-7">
+        <li className="text-muted marker:text-faint pl-1 leading-7 marker:font-mono marker:text-[0.875em]">
           <RichText value={block.numbered_list_item.rich_text} />
-          <Children blocks={block.children} indented />
+          <Children blocks={block.children} anchors={anchors} indented />
         </li>
       );
 
     case "quote":
       return (
-        <blockquote className="border-foreground/20 text-muted-foreground border-l-2 pl-6 italic">
+        <blockquote className="border-line-strong text-fg text-lead border-l-2 pl-5 leading-7">
           <RichText value={block.quote.rich_text} />
-          <Children blocks={block.children} />
+          <Children blocks={block.children} anchors={anchors} />
         </blockquote>
       );
 
     case "callout": {
-      const icon =
-        block.callout.icon?.type === "emoji" ? block.callout.icon.emoji : "💡";
+      const icon = iconOf(
+        block.callout.icon,
+        `/api/notion-image?type=block&id=${block.id}`,
+      );
       return (
-        <aside className="bg-muted/60 flex gap-3 rounded-lg border p-4">
-          <span aria-hidden className="text-lg leading-7">
-            {icon}
+        <aside className="bg-surface ring-line flex gap-3 rounded-lg p-4 ring-1 ring-inset">
+          <span className="flex h-7 shrink-0 items-center">
+            {icon ? (
+              <NotionIconView icon={icon} className="text-lead size-5" />
+            ) : (
+              <span aria-hidden className="text-lead">
+                💡
+              </span>
+            )}
           </span>
-          <div className="min-w-0 flex-1 leading-7">
+          <div className="text-muted min-w-0 flex-1 leading-7">
             <RichText value={block.callout.rich_text} />
-            <Children blocks={block.children} />
+            <Children blocks={block.children} anchors={anchors} indented />
           </div>
         </aside>
       );
@@ -129,7 +191,7 @@ function Block({ block }: { block: BlockNode }) {
             language={block.code.language}
           />
           {block.code.caption.length > 0 && (
-            <figcaption className="text-muted-foreground mt-2 text-sm">
+            <figcaption className="text-meta text-faint mt-2">
               <RichText value={block.code.caption} />
             </figcaption>
           )}
@@ -137,21 +199,22 @@ function Block({ block }: { block: BlockNode }) {
       );
 
     case "divider":
-      return <hr className="my-10" />;
+      return <hr className="border-line my-10" />;
 
     case "image":
       return (
         <figure>
-          {/* Notion gives no dimensions and the proxy 302s to a signed URL. */}
+          {/* Notion gives no dimensions and the proxy 307s to a signed URL. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={fileUrl(block, block.image)}
             alt={plainText(block.image.caption) || ""}
             loading="lazy"
-            className="w-full rounded-lg border"
+            decoding="async"
+            className="ring-line w-full rounded-xl ring-1"
           />
           {block.image.caption.length > 0 && (
-            <figcaption className="text-muted-foreground mt-2 text-center text-sm">
+            <figcaption className="text-meta text-faint mt-2.5 text-center">
               <RichText value={block.image.caption} />
             </figcaption>
           )}
@@ -160,11 +223,12 @@ function Block({ block }: { block: BlockNode }) {
 
     case "video":
       return block.video.type === "external" ? (
-        <div className="aspect-video overflow-hidden rounded-lg border">
+        <div className="ring-line aspect-video overflow-hidden rounded-xl ring-1">
           <iframe
             src={block.video.external.url.replace("watch?v=", "embed/")}
             title={plainText(block.video.caption) || "Video"}
             allowFullScreen
+            loading="lazy"
             className="size-full"
           />
         </div>
@@ -172,7 +236,8 @@ function Block({ block }: { block: BlockNode }) {
         <video
           src={fileUrl(block, block.video)}
           controls
-          className="w-full rounded-lg border"
+          preload="metadata"
+          className="ring-line w-full rounded-xl ring-1"
         />
       );
 
@@ -185,22 +250,38 @@ function Block({ block }: { block: BlockNode }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:bg-muted/60 block truncate rounded-lg border px-4 py-3 text-sm transition-colors"
+          className="group bg-surface ring-line hover:bg-surface-hover hover:ring-line-strong flex items-center gap-3 rounded-lg px-4 py-3 ring-1 transition-[background-color,box-shadow] ring-inset"
         >
-          <span className="text-muted-foreground">Link → </span>
-          {url}
+          <span className="min-w-0 flex-1">
+            <span className="text-small text-fg block truncate font-medium">
+              {hostOf(url)}
+            </span>
+            <span className="text-meta text-faint block truncate font-mono">
+              {url}
+            </span>
+          </span>
+          <ArrowUpRight
+            aria-hidden
+            className="text-faint group-hover:text-fg size-3.5 shrink-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+          />
         </Link>
       );
     }
 
     case "toggle":
       return (
-        <details className="group rounded-lg border px-4 py-3">
-          <summary className="cursor-pointer leading-7 font-medium marker:text-neutral-400">
-            <RichText value={block.toggle.rich_text} />
+        <details className="group/toggle bg-surface ring-line rounded-lg ring-1 ring-inset">
+          <summary className="text-fg hover:bg-surface-hover flex cursor-pointer list-none items-start gap-2 rounded-lg px-4 py-3 leading-7 font-medium transition-colors [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              aria-hidden
+              className="text-faint mt-1.5 size-4 shrink-0 transition-transform group-open/toggle:rotate-90"
+            />
+            <span>
+              <RichText value={block.toggle.rich_text} />
+            </span>
           </summary>
-          <div className="mt-3">
-            <Children blocks={block.children} />
+          <div className="px-4 pt-1 pb-4 pl-10">
+            <Children blocks={block.children} anchors={anchors} />
           </div>
         </details>
       );
@@ -210,7 +291,7 @@ function Block({ block }: { block: BlockNode }) {
         <div className="grid gap-6 md:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
           {block.children.map((column) => (
             <div key={column.id} className="min-w-0">
-              <Children blocks={column.children} />
+              <Children blocks={column.children} anchors={anchors} />
             </div>
           ))}
         </div>
@@ -221,15 +302,15 @@ function Block({ block }: { block: BlockNode }) {
       const hasHeader = block.table.has_column_header && head;
       const rows = hasHeader ? body : block.children;
       return (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
+        <div className="ring-line overflow-x-auto rounded-lg ring-1 ring-inset">
+          <table className="text-small w-full">
             {hasHeader && head.type === "table_row" && (
-              <thead className="bg-muted/60">
+              <thead className="bg-surface">
                 <tr>
                   {head.table_row.cells.map((cell, index) => (
                     <th
                       key={index}
-                      className="border-b px-4 py-2 text-left font-medium"
+                      className="border-line text-fg border-b px-4 py-2.5 text-left font-medium"
                     >
                       <RichText value={cell} />
                     </th>
@@ -241,9 +322,9 @@ function Block({ block }: { block: BlockNode }) {
               {rows.map(
                 (row) =>
                   row.type === "table_row" && (
-                    <tr key={row.id} className="border-b last:border-0">
+                    <tr key={row.id} className="border-line border-b last:border-0">
                       {row.table_row.cells.map((cell, index) => (
-                        <td key={index} className="px-4 py-2 align-top">
+                        <td key={index} className="text-muted px-4 py-2.5 align-top">
                           <RichText value={cell} />
                         </td>
                       ))}
@@ -258,7 +339,7 @@ function Block({ block }: { block: BlockNode }) {
 
     case "equation":
       return (
-        <pre className="bg-muted overflow-x-auto rounded-lg border p-4 text-center font-mono text-sm">
+        <pre className="bg-surface ring-line text-ui text-fg overflow-x-auto rounded-lg p-4 text-center font-mono ring-1 ring-inset">
           {block.equation.expression}
         </pre>
       );
@@ -279,11 +360,13 @@ function Block({ block }: { block: BlockNode }) {
  * Renders a run of sibling blocks, wrapping consecutive list items in a single
  * `<ul>`/`<ol>` so numbering and bullets are continuous.
  */
-export function Children({
+function Children({
   blocks,
+  anchors,
   indented = false,
 }: {
   blocks: BlockNode[];
+  anchors: Anchors;
   indented?: boolean;
 }) {
   if (blocks.length === 0) return null;
@@ -305,26 +388,25 @@ export function Children({
   }
 
   return (
-    <div className={cn("space-y-4", indented && "mt-2 ml-1 space-y-2")}>
+    <div className={cn("space-y-5", indented && "mt-2 ml-1 space-y-2")}>
       {groups.map((group, index) => {
         const key = `${group.type}-${group.items[0].id}-${index}`;
+        const items = group.items.map((item) => (
+          <Block key={item.id} block={item} anchors={anchors} />
+        ));
 
         if (group.type === "numbered_list_item") {
           return (
-            <ol key={key} className="ml-6 list-decimal space-y-2">
-              {group.items.map((item) => (
-                <Block key={item.id} block={item} />
-              ))}
+            <ol key={key} className="ml-5 list-decimal space-y-2">
+              {items}
             </ol>
           );
         }
 
         if (group.type === "bulleted_list_item") {
           return (
-            <ul key={key} className="ml-6 list-disc space-y-2">
-              {group.items.map((item) => (
-                <Block key={item.id} block={item} />
-              ))}
+            <ul key={key} className="ml-5 list-disc space-y-2">
+              {items}
             </ul>
           );
         }
@@ -332,24 +414,24 @@ export function Children({
         if (group.type === "to_do") {
           return (
             <ul key={key} className="space-y-2">
-              {group.items.map((item) => (
-                <Block key={item.id} block={item} />
-              ))}
+              {items}
             </ul>
           );
         }
 
-        return (
-          <Fragment key={key}>
-            <Block block={group.items[0]} />
-          </Fragment>
-        );
+        return <Fragment key={key}>{items}</Fragment>;
       })}
     </div>
   );
 }
 
 /** Entry point: renders a full Notion page body. */
-export function NotionBlocks({ blocks }: { blocks: BlockNode[] }) {
-  return <Children blocks={blocks} />;
+export function NotionBlocks({
+  blocks,
+  anchors = new Map(),
+}: {
+  blocks: BlockNode[];
+  anchors?: Anchors;
+}) {
+  return <Children blocks={blocks} anchors={anchors} />;
 }

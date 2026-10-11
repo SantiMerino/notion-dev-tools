@@ -8,6 +8,7 @@ import {
 
 import { blogPageId, notion } from "./client";
 import { blockRichText, fetchBlockTree, plainText, type BlockNode } from "./blocks";
+import { iconOf, type NotionIcon } from "./icons";
 import { slugify, uniqueSlug } from "./slug";
 
 /** Cache tag invalidated by POST /api/revalidate. */
@@ -21,21 +22,12 @@ export type SeriesInfo = {
   total: number;
 };
 
-/**
- * A post's Notion page icon, normalized for rendering: either a Unicode emoji
- * or an image URL (already a stable link or a proxy path, never a raw signed
- * one).
- */
-export type PostIcon =
-  | { kind: "emoji"; emoji: string }
-  | { kind: "image"; url: string };
-
 export type Post = {
   id: string;
   slug: string;
   title: string;
   excerpt: string;
-  icon: PostIcon | null;
+  icon: NotionIcon | null;
   coverUrl: string | null;
   createdAt: string;
   updatedAt: string;
@@ -64,10 +56,17 @@ function parseSeriesTitle(
   };
 }
 
-export type PostWithContent = Post & { blocks: BlockNode[] };
+export type PostWithContent = Post & {
+  blocks: BlockNode[];
+  /** Estimated from the body's word count; at least 1. */
+  readingMinutes: number;
+};
 
 /** A post plus a flattened copy of its body, for client-side search. */
-export type SearchablePost = Post & { searchText: string };
+export type SearchablePost = Post & {
+  searchText: string;
+  readingMinutes: number | null;
+};
 
 /** Caps how much body text per post is shipped to the browser for searching. */
 const SEARCH_TEXT_LIMIT = 4000;
@@ -76,7 +75,7 @@ const SEARCH_TEXT_LIMIT = 4000;
  * A post is hidden while its title starts with `_` or `[draft]`, so you can
  * work on it inside "web-blog" without publishing it.
  */
-function isDraft(title: string): boolean {
+export function isDraft(title: string): boolean {
   const trimmed = title.trim();
   return trimmed.startsWith("_") || /^\[draft\]/i.test(trimmed);
 }
@@ -89,30 +88,6 @@ function buildExcerpt(blocks: BlockNode[]): string {
     if (text) return text.length > 200 ? `${text.slice(0, 197)}...` : text;
   }
   return "";
-}
-
-/**
- * Normalize a page icon to something renderable. Notion has five icon types: a
- * Unicode `emoji`; a workspace `custom_emoji` and an `external` link, both on
- * stable URLs usable as-is; an uploaded `file`, whose URL is pre-signed and
- * expires in about an hour, so it goes through the same proxy as covers; and
- * the built-in `icon` gallery, which we don't render.
- */
-function iconOf(page: PageObjectResponse): PostIcon | null {
-  const icon = page.icon;
-  if (!icon) return null;
-  switch (icon.type) {
-    case "emoji":
-      return { kind: "emoji", emoji: icon.emoji };
-    case "custom_emoji":
-      return { kind: "image", url: icon.custom_emoji.url };
-    case "external":
-      return { kind: "image", url: icon.external.url };
-    case "file":
-      return { kind: "image", url: `/api/notion-image?type=icon&id=${page.id}` };
-    default:
-      return null;
-  }
 }
 
 /**
@@ -228,7 +203,9 @@ async function postsFor(fingerprint: string): Promise<Post[]> {
             children: [],
           })),
         ),
-        icon: isFullPage(page) ? iconOf(page) : null,
+        icon: isFullPage(page)
+          ? iconOf(page.icon, `/api/notion-image?type=icon&id=${page.id}`)
+          : null,
         coverUrl: isFullPage(page) ? coverUrlOf(page) : null,
         createdAt: block.created_time,
         updatedAt: block.last_edited_time,
@@ -275,6 +252,14 @@ function blocksToText(blocks: BlockNode[]): string {
   return parts.join("\n");
 }
 
+/** A comfortable silent-reading pace, in Spanish or English. */
+const WORDS_PER_MINUTE = 200;
+
+function readingMinutesOf(blocks: BlockNode[]): number {
+  const words = blocksToText(blocks).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
+}
+
 /**
  * Posts with their body text attached, for the search box on the home page.
  * Reuses the per-slug `getPost` cache entries rather than refetching.
@@ -302,6 +287,7 @@ async function searchablePostsFor(
         searchText: full
           ? blocksToText(full.blocks).slice(0, SEARCH_TEXT_LIMIT)
           : "",
+        readingMinutes: full?.readingMinutes ?? null,
       };
     }),
   );
@@ -325,5 +311,6 @@ async function postFor(
   );
   if (!post) return null;
 
-  return { ...post, blocks: await fetchBlockTree(post.id) };
+  const blocks = await fetchBlockTree(post.id);
+  return { ...post, blocks, readingMinutes: readingMinutesOf(blocks) };
 }
