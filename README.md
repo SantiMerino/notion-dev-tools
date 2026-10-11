@@ -122,12 +122,10 @@ note. They pause while you type in a field.
   posts carry an `_series` object (`title`, `part_title`, `part`, `total`).
 - `/sitemap.xml` and `/robots.txt` for search engines.
 
-The portfolio's Writing section currently reads the **home page HTML**
-(`santimh/server/writing.ts`), so the post cards keep a markup contract: inside
-each `<a href="/posts/…">`, the first `<time dateTime>` is the date, the `<h2>`
-is the title, the `<p>` right before it is the series line and the `<p>` right
-after it is the excerpt. `/feed.json` has the same data in a structured form;
-switching the portfolio to it removes the contract.
+The portfolio's Writing section is built from `/feed.json`
+(`santimh/server/writing.ts`). It reads each item's `url`, `title`, `summary`,
+`date_published` and `_series`; change those and the portfolio needs the same
+change. The page markup itself is free to change.
 
 ## Notes
 
