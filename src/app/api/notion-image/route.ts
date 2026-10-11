@@ -1,18 +1,44 @@
-import { isFullBlock, isFullPage } from "@notionhq/client";
+import {
+  isFullBlock,
+  isFullPage,
+  type PageObjectResponse,
+} from "@notionhq/client";
 import type { NextRequest } from "next/server";
 
-import { notion } from "@/lib/notion/client";
+import { blogPageId, notion } from "@/lib/notion/client";
+import { isDraft } from "@/lib/notion/posts";
 
 const UUID = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 
-/** Pull the signed URL out of any Notion file-bearing block. */
+type FileValue = { type?: string; file?: { url: string } };
+
+/** Pull the signed URL out of any Notion file-bearing block, or a callout's uploaded icon. */
 function urlFromBlock(block: unknown): string | null {
-  const body = block as Record<string, { type?: string; file?: { url: string } }>;
+  const body = block as Record<string, FileValue & { icon?: FileValue | null }>;
   for (const key of ["image", "video", "file", "pdf"] as const) {
     const value = body[key];
     if (value?.type === "file" && value.file) return value.file.url;
   }
+  const icon = body.callout?.icon;
+  if (icon?.type === "file" && icon.file) return icon.file.url;
   return null;
+}
+
+const bare = (id: string) => id.replace(/-/g, "").toLowerCase();
+
+/**
+ * Only published posts' covers and icons go out: the integration can read
+ * drafts under "web-blog" too, and an id is all a request needs.
+ */
+function isPublishedPost(page: PageObjectResponse): boolean {
+  if (page.parent.type !== "page_id") return false;
+  if (bare(page.parent.page_id) !== bare(blogPageId())) return false;
+  const title = Object.values(page.properties).find(
+    (property) => property.type === "title",
+  );
+  const text =
+    title?.type === "title" ? title.title.map((t) => t.plain_text).join("") : "";
+  return !isDraft(text);
 }
 
 /**
@@ -32,15 +58,11 @@ export async function GET(request: NextRequest) {
   try {
     let url: string | null = null;
 
-    if (type === "cover") {
+    if (type === "cover" || type === "icon") {
       const page = await notion.pages.retrieve({ page_id: id });
-      if (isFullPage(page) && page.cover?.type === "file") {
-        url = page.cover.file.url;
-      }
-    } else if (type === "icon") {
-      const page = await notion.pages.retrieve({ page_id: id });
-      if (isFullPage(page) && page.icon?.type === "file") {
-        url = page.icon.file.url;
+      if (isFullPage(page) && isPublishedPost(page)) {
+        const asset = type === "cover" ? page.cover : page.icon;
+        if (asset?.type === "file") url = asset.file.url;
       }
     } else {
       const block = await notion.blocks.retrieve({ block_id: id });
