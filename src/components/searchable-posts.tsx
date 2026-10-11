@@ -7,6 +7,7 @@ import { ArrowUpRight, Search, X } from "lucide-react";
 
 import { NotionIconView } from "@/components/notion/icon";
 import { SeriesChip } from "@/components/series-chip";
+import { FOCUS_SEARCH_KEY, SEARCH_INPUT_ID } from "@/components/shortcuts-note";
 import { formatDate, formatDay, formatMonth, monthKey } from "@/lib/format";
 import type { SearchablePost } from "@/lib/notion/posts";
 import { fold, findSnippet, type Snippet } from "@/lib/search";
@@ -26,31 +27,21 @@ type Result = SearchablePost & { snippet: Snippet | null };
 const reveal = (index: number): CSSProperties =>
   ({ "--i": Math.min(index, 12) }) as CSSProperties;
 
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
-  );
-}
-
 export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const trimmed = query.trim();
 
-  // `/` jumps to the search box, as on most docs sites.
+  // `/` pressed on another page brings the visitor here; take focus on arrival.
+  // (On this page the shortcut focuses the box by its id.)
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "/" || isTyping(event.target)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      event.preventDefault();
-      input.current?.focus();
+    try {
+      if (!sessionStorage.getItem(FOCUS_SEARCH_KEY)) return;
+      sessionStorage.removeItem(FOCUS_SEARCH_KEY);
+    } catch {
+      return;
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    input.current?.focus();
   }, []);
 
   const results = useMemo<Result[]>(() => {
@@ -89,6 +80,7 @@ export function SearchablePosts({ posts }: { posts: SearchablePost[] }) {
         />
         <input
           ref={input}
+          id={SEARCH_INPUT_ID}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}

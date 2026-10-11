@@ -110,6 +110,11 @@ default with the same `santimh-theme` storage key, and the same class names
 for them (`bg-surface`, `text-muted`, `ring-line`, ...). `src/app/globals.css`
 mirrors the portfolio's `src/index.css`; change one, change the other.
 
+The keyboard shortcuts work the same way too (`src/hooks/use-hotkey.ts`), and
+the "? Keys" note beside the theme toggle lists them: `T` switches the theme,
+`/` searches posts from any page, `H` goes back to all posts, `?` opens the
+note. They pause while you type in a field.
+
 ## Feeds
 
 - `/feed.xml` — RSS 2.0, for feed readers.

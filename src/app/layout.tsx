@@ -3,6 +3,7 @@ import { cacheLife } from "next/cache";
 import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
+import { ShortcutsNote } from "@/components/shortcuts-note";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -108,6 +109,7 @@ export default function RootLayout({
           >
             Skip to content
           </a>
+          <ShortcutsNote />
           <ThemeToggle />
           <SiteHeader />
 
