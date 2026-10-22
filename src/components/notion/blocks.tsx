@@ -35,6 +35,68 @@ function hostOf(url: string): string {
 }
 
 /**
+ * The player URL for a video Notion links to, or null when there isn't one:
+ * most hosts refuse to be framed, so anything but YouTube and Vimeo renders
+ * as a link card instead of an iframe that says "refused to connect".
+ */
+function embedUrl(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.replace(/^(www|m)\./, "");
+
+  let youtubeId: string | null | undefined;
+  if (host === "youtu.be") {
+    youtubeId = parsed.pathname.match(/^\/([\w-]+)$/)?.[1];
+  } else if (host === "youtube.com") {
+    youtubeId =
+      parsed.pathname === "/watch"
+        ? parsed.searchParams.get("v")
+        : parsed.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]+)$/)?.[1];
+  }
+  if (youtubeId && /^[\w-]+$/.test(youtubeId)) {
+    // A share link's `t=42` / `t=42s`; the player calls it `start`.
+    const start = parsed.searchParams.get("t")?.match(/^(\d+)s?$/)?.[1];
+    return `https://www.youtube.com/embed/${youtubeId}${start ? `?start=${start}` : ""}`;
+  }
+
+  const vimeoId =
+    host === "vimeo.com" ? parsed.pathname.match(/^\/(\d+)/)?.[1] : undefined;
+  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}`;
+  if (host === "player.vimeo.com") return url;
+
+  return null;
+}
+
+/** A bookmark-style card: the host, the full URL under it, opening in a new tab. */
+function LinkCard({ url }: { url: string }) {
+  return (
+    <Link
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group bg-surface ring-line hover:bg-surface-hover hover:ring-line-strong flex items-center gap-3 rounded-lg px-4 py-3 ring-1 transition-[background-color,box-shadow] ring-inset"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="text-small text-fg block truncate font-medium">
+          {hostOf(url)}
+        </span>
+        <span className="text-meta text-faint block truncate font-mono">
+          {url}
+        </span>
+      </span>
+      <ArrowUpRight
+        aria-hidden
+        className="text-faint group-hover:text-fg size-3.5 shrink-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+      />
+    </Link>
+  );
+}
+
+/**
  * A post heading with a `#` link in the left margin, so any section can be
  * shared. Notion's H1–H3 render one level down: the post title is the `<h1>`.
  */
@@ -221,52 +283,42 @@ function Block({ block, anchors }: { block: BlockNode; anchors: Anchors }) {
         </figure>
       );
 
-    case "video":
-      return block.video.type === "external" ? (
+    case "video": {
+      if (block.video.type !== "external") {
+        return (
+          <video
+            src={fileUrl(block, block.video)}
+            controls
+            preload="metadata"
+            className="ring-line w-full rounded-xl ring-1"
+          />
+        );
+      }
+      const player = embedUrl(block.video.external.url);
+      if (!player) return <LinkCard url={block.video.external.url} />;
+      return (
         <div className="ring-line aspect-video overflow-hidden rounded-xl ring-1">
           <iframe
-            src={block.video.external.url.replace("watch?v=", "embed/")}
+            src={player}
             title={plainText(block.video.caption) || "Video"}
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             loading="lazy"
+            // YouTube's player refuses to load without a referrer (error 153).
+            referrerPolicy="strict-origin-when-cross-origin"
             className="size-full"
           />
         </div>
-      ) : (
-        <video
-          src={fileUrl(block, block.video)}
-          controls
-          preload="metadata"
-          className="ring-line w-full rounded-xl ring-1"
-        />
-      );
-
-    case "bookmark":
-    case "embed": {
-      const url =
-        block.type === "bookmark" ? block.bookmark.url : block.embed.url;
-      return (
-        <Link
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group bg-surface ring-line hover:bg-surface-hover hover:ring-line-strong flex items-center gap-3 rounded-lg px-4 py-3 ring-1 transition-[background-color,box-shadow] ring-inset"
-        >
-          <span className="min-w-0 flex-1">
-            <span className="text-small text-fg block truncate font-medium">
-              {hostOf(url)}
-            </span>
-            <span className="text-meta text-faint block truncate font-mono">
-              {url}
-            </span>
-          </span>
-          <ArrowUpRight
-            aria-hidden
-            className="text-faint group-hover:text-fg size-3.5 shrink-0 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-          />
-        </Link>
       );
     }
+
+    case "bookmark":
+    case "embed":
+      return (
+        <LinkCard
+          url={block.type === "bookmark" ? block.bookmark.url : block.embed.url}
+        />
+      );
 
     case "toggle":
       return (
