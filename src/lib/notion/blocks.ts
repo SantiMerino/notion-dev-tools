@@ -11,7 +11,7 @@ import { notion } from "./client";
 export type BlockNode = BlockObjectResponse & { children: BlockNode[] };
 
 /** Notion nests indefinitely; this caps runaway recursion on pathological pages. */
-const MAX_DEPTH = 5;
+export const MAX_DEPTH = 5;
 
 /**
  * Fetch a block's children as a tree. `child_page` blocks are treated as

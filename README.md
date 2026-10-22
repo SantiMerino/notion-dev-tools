@@ -31,15 +31,13 @@ waiting on Notion. A change in Notion goes live one of two ways:
 ## Setup
 
 1. Create an internal integration at
-   <https://www.notion.so/profile/integrations> and copy its token.
+   <https://www.notion.so/profile/integrations> in the workspace that holds
+   **web-blog**, and copy its token. Under **Capabilities**, **Read content**
+   is all the site uses; leave the rest off.
 
-2. Put the token in `.env.local`:
-
-   ```
-   NOTION_TOKEN=ntn_...
-   ```
-
-   `NOTION_BLOG_PAGE_ID` and `REVALIDATE_SECRET` are already filled in.
+2. Copy `.env.example` to `.env.local` and fill in `NOTION_TOKEN`,
+   `NOTION_BLOG_PAGE_ID` (the 32-character id at the end of the page's link)
+   and `REVALIDATE_SECRET`. The file explains each one.
 
 3. **Share the page with the integration.** This is the step everyone misses —
    without it the API returns 404 even though the token is valid. Open the
@@ -141,6 +139,59 @@ change. The page markup itself is free to change.
 ## Deploying
 
 Push to GitHub, import on Vercel, and set `NOTION_TOKEN`,
-`NOTION_BLOG_PAGE_ID`, and `REVALIDATE_SECRET` as environment variables. The
-build calls Notion to prerender every post, so the token must be present at
-build time.
+`NOTION_BLOG_PAGE_ID`, and `REVALIDATE_SECRET` as environment variables, plus
+`NOTION_WEBHOOK_SECRET` once the webhook is verified and
+`NEXT_PUBLIC_SITE_URL` if the domain isn't notion.santimh.dev. The build calls
+Notion to prerender every post, so the token must be present at build time,
+and a changed variable only takes effect after a redeploy.
+
+## Moving to another Notion workspace
+
+Notion can't move a page between workspaces, only copy it. The copies get
+new ids and today's `created_time`, so on their own they would re-date every
+post to moving day, re-sort the index, and show up in feed readers as new
+posts. `src/lib/notion/moved-posts.json` keeps the old ids and dates, keyed
+by slug, so none of that happens. Slugs come from titles, so URLs stay the
+same as long as titles don't change.
+
+1. **Snapshot the live site**, right before copying anything:
+
+   ```bash
+   npm run snapshot-dates
+   ```
+
+   Commit `moved-posts.json` and deploy. Nothing changes yet; the site now
+   just knows the dates it must keep.
+
+2. **Copy web-blog.** In the old workspace, open **web-blog** → `···` →
+   **Move to** → pick the new workspace. Try it on a throwaway page first.
+   Leave the original where it is until the switch is done: the live site
+   still reads from it. Then go through the copies: images, code blocks,
+   callouts, and custom-emoji icons (custom emoji belong to a workspace, so
+   re-add them in the new one). Titles must stay exactly as they were.
+
+3. **New integration.** In the new workspace, create an internal integration
+   (Setup step 1) and connect it to the new **web-blog** (Setup step 3).
+   Share nothing else with it: the webhook fires for every page the
+   integration can see.
+
+4. **Try it locally.** Put the new token and page id in `.env.local`, run
+   `npm run dev`, and compare with the live site: same posts, same URLs, same
+   dates, images loading.
+
+5. **Switch production.** In Vercel, set `NOTION_TOKEN` and
+   `NOTION_BLOG_PAGE_ID` to the new values and redeploy.
+
+6. **New webhook.** Webhook subscriptions belong to an integration, so make
+   a new one ("Refreshing after an edit" above). It comes with a new
+   `verification_token`, which replaces `NOTION_WEBHOOK_SECRET`; redeploy
+   again. Edit a post and check the change shows within seconds.
+
+7. **Clean up.** Delete the old integration (which also ends its webhook),
+   and archive the old **web-blog** once you're sure you won't need it.
+
+If a post's URL ends in a six-character id (`my-post-1a2b3c`, from two posts
+sharing a title), that suffix comes from the Notion id, so that one URL
+changes with the copy. Drafts aren't in the feed, so
+they aren't in the snapshot either: a draft published after the move is
+dated the day of the copy.

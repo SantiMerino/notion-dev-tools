@@ -1,4 +1,4 @@
-import { absolute, FEED_CACHE_CONTROL, feedTitle } from "@/lib/feed";
+import { absolute, FEED_CACHE_CONTROL, feedId, feedTitle } from "@/lib/feed";
 import { getPosts } from "@/lib/notion/posts";
 import { site } from "@/lib/site";
 
@@ -22,7 +22,7 @@ export async function GET() {
     language: "es",
     authors: [{ name: site.name, url: site.portfolioUrl }],
     items: posts.map((post) => ({
-      id: post.id,
+      id: feedId(post),
       url: absolute(`/posts/${post.slug}`),
       title: feedTitle(post),
       summary: post.excerpt || undefined,

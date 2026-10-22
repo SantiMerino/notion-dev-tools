@@ -1,10 +1,12 @@
 import {
   isFullBlock,
   isFullPage,
+  type BlockObjectResponse,
   type PageObjectResponse,
 } from "@notionhq/client";
 import type { NextRequest } from "next/server";
 
+import { MAX_DEPTH } from "@/lib/notion/blocks";
 import { blogPageId, notion } from "@/lib/notion/client";
 import { isDraft } from "@/lib/notion/posts";
 
@@ -27,10 +29,13 @@ function urlFromBlock(block: unknown): string | null {
 const bare = (id: string) => id.replace(/-/g, "").toLowerCase();
 
 /**
- * Only published posts' covers and icons go out: the integration can read
- * drafts under "web-blog" too, and an id is all a request needs.
+ * Only published posts' files go out: the integration can read drafts and
+ * trashed pages under "web-blog" too, and an id is all a request needs. An
+ * unpublished or deleted post's old image links stay out there (cached
+ * pages, feed readers, search results), so they must stop resolving.
  */
 function isPublishedPost(page: PageObjectResponse): boolean {
+  if (page.in_trash) return false;
   if (page.parent.type !== "page_id") return false;
   if (bare(page.parent.page_id) !== bare(blogPageId())) return false;
   const title = Object.values(page.properties).find(
@@ -39,6 +44,28 @@ function isPublishedPost(page: PageObjectResponse): boolean {
   const text =
     title?.type === "title" ? title.title.map((t) => t.plain_text).join("") : "";
   return !isDraft(text);
+}
+
+/**
+ * Walk up from a block to the page it lives in, through toggles, columns and
+ * other parents. The renderer stops at `MAX_DEPTH`, so no rendered block has
+ * more ancestors than that to climb.
+ */
+async function inPublishedPost(block: BlockObjectResponse): Promise<boolean> {
+  let current = block;
+  for (let depth = 0; depth < MAX_DEPTH; depth++) {
+    if (current.in_trash) return false;
+    const { parent } = current;
+    if (parent.type === "page_id") {
+      const page = await notion.pages.retrieve({ page_id: parent.page_id });
+      return isFullPage(page) && isPublishedPost(page);
+    }
+    if (parent.type !== "block_id") return false;
+    const next = await notion.blocks.retrieve({ block_id: parent.block_id });
+    if (!isFullBlock(next)) return false;
+    current = next;
+  }
+  return false;
 }
 
 /**
@@ -66,7 +93,10 @@ export async function GET(request: NextRequest) {
       }
     } else {
       const block = await notion.blocks.retrieve({ block_id: id });
-      if (isFullBlock(block)) url = urlFromBlock(block);
+      if (isFullBlock(block)) {
+        const file = urlFromBlock(block);
+        if (file && (await inPublishedPost(block))) url = file;
+      }
     }
 
     if (!url) return new Response("Not found", { status: 404 });

@@ -3,12 +3,14 @@ import {
   collectPaginatedAPI,
   isFullBlock,
   isFullPage,
+  type ChildPageBlockObjectResponse,
   type PageObjectResponse,
 } from "@notionhq/client";
 
 import { blogPageId, notion } from "./client";
 import { blockRichText, fetchBlockTree, plainText, type BlockNode } from "./blocks";
 import { iconOf, type NotionIcon } from "./icons";
+import { postDates } from "./moved-posts";
 import { slugify, uniqueSlug } from "./slug";
 
 /** Cache tag invalidated by POST /api/revalidate. */
@@ -146,16 +148,20 @@ function listBlogChildren() {
 /**
  * The blog page's children that are published posts, oldest first, with the
  * slug each one is served at. Oldest first so slug collisions suffix the newer
- * post, keeping already-published URLs stable.
+ * post, keeping already-published URLs stable. "Oldest" is the publish date,
+ * which survives a workspace move; `created_time` doesn't.
  */
 function publishedPages(
   children: Awaited<ReturnType<typeof listBlogChildren>>,
 ) {
+  const published = (block: ChildPageBlockObjectResponse) =>
+    postDates(slugify(block.child_page.title), block).createdAt;
+
   const pages = children
     .filter(isFullBlock)
     .filter((block) => block.type === "child_page")
     .filter((block) => !isDraft(block.child_page.title))
-    .sort((a, b) => a.created_time.localeCompare(b.created_time));
+    .sort((a, b) => published(a).localeCompare(published(b)));
 
   const taken = new Set<string>();
   const slugs = pages.map((block) =>
@@ -224,6 +230,7 @@ async function postsFor(fingerprint: string): Promise<Post[]> {
 
       const parsed = parseSeriesTitle(block.child_page.title);
       const total = parsed ? (seriesCounts.get(parsed.seriesTitle) ?? 0) : 0;
+      const { createdAt, updatedAt } = postDates(slugs[index], block);
 
       return {
         id: block.id,
@@ -239,8 +246,8 @@ async function postsFor(fingerprint: string): Promise<Post[]> {
           ? iconOf(page.icon, `/api/notion-image?type=icon&id=${page.id}`)
           : null,
         coverUrl: isFullPage(page) ? coverUrlOf(page) : null,
-        createdAt: block.created_time,
-        updatedAt: block.last_edited_time,
+        createdAt,
+        updatedAt,
         series:
           parsed && total > 1
             ? { ...parsed, total }
