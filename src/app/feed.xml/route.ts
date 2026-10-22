@@ -1,4 +1,10 @@
-import { absolute, FEED_CACHE_CONTROL, feedTitle, lastEdited } from "@/lib/feed";
+import {
+  absolute,
+  FEED_CACHE_CONTROL,
+  feedId,
+  feedTitle,
+  lastEdited,
+} from "@/lib/feed";
 import { getPosts } from "@/lib/notion/posts";
 import { site } from "@/lib/site";
 
@@ -23,7 +29,7 @@ export async function GET() {
         "    <item>",
         `      <title>${escapeXml(feedTitle(post))}</title>`,
         `      <link>${escapeXml(url)}</link>`,
-        `      <guid isPermaLink="false">${post.id}</guid>`,
+        `      <guid isPermaLink="false">${feedId(post)}</guid>`,
         `      <pubDate>${new Date(post.createdAt).toUTCString()}</pubDate>`,
         post.excerpt
           ? `      <description>${escapeXml(post.excerpt)}</description>`

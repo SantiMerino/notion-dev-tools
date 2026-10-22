@@ -1,3 +1,4 @@
+import { originalId } from "@/lib/notion/moved-posts";
 import type { Post } from "@/lib/notion/posts";
 import { site } from "@/lib/site";
 
@@ -11,6 +12,14 @@ export function feedTitle(post: Post): string {
   return post.series
     ? `${post.series.seriesTitle}: ${post.series.displayTitle}`
     : post.title;
+}
+
+/**
+ * The id feed readers know a post by. It stays the pre-move Notion id after a
+ * workspace move, so readers don't list every post a second time as new.
+ */
+export function feedId(post: Post): string {
+  return originalId(post.slug) ?? post.id;
 }
 
 /**

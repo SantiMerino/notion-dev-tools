@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "snapshot-dates": "node scripts/snapshot-dates.mjs"
   },
   "dependencies": {
     "@notionhq/client": "^5.23.2",
