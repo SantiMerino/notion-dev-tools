@@ -1,4 +1,4 @@
-import { absolute, FEED_CACHE_CONTROL, feedTitle } from "@/lib/feed";
+import { absolute, FEED_CACHE_CONTROL, feedTitle, lastEdited } from "@/lib/feed";
 import { getPosts } from "@/lib/notion/posts";
 import { site } from "@/lib/site";
 
@@ -14,7 +14,7 @@ function escapeXml(value: string): string {
 /** Every published post as RSS 2.0, for feed readers. */
 export async function GET() {
   const posts = await getPosts();
-  const newest = posts[0]?.updatedAt;
+  const newest = lastEdited(posts);
 
   const items = posts
     .map((post) => {

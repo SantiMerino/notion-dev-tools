@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { absolute } from "@/lib/feed";
+import { absolute, lastEdited } from "@/lib/feed";
 import { getPosts } from "@/lib/notion/posts";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -9,7 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     {
       url: absolute("/"),
-      lastModified: posts[0]?.updatedAt,
+      lastModified: lastEdited(posts),
       changeFrequency: "weekly",
       priority: 1,
     },
